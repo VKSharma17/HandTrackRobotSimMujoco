@@ -10,50 +10,76 @@ class RobotSimulator:
     Loads the robot MJCF model, manages the simulation state (mjData), 
     and handles the passive rendering window.
     """
-    def __init__(self, model_path: str = "simple_arm.xml", mocap_name: str = "mocap_target", ee_name: str = "end_effector") -> None:
+    def __init__(self, model_path: str = "simple_arm.xml", mocap_name: Optional[str] = None, ee_name: Optional[str] = None) -> None:
         """
         Initializes the MuJoCo simulation environment.
 
         Args:
             model_path: Path to the robot's MJCF XML model file.
-            mocap_name: Name of the mocap body in the XML.
-            ee_name: Name of the end-effector body in the XML.
+            mocap_name: Optional legacy parameter for backward compatibility.
+            ee_name: Optional legacy parameter for backward compatibility.
         """
         print(f"[INFO] Loading MuJoCo model from: {model_path}")
         self.model = mujoco.MjModel.from_xml_path(model_path)
         self.data = mujoco.MjData(self.model)
-        self.ee_name = ee_name
-
-        # Retrieve the body ID and mocap index for the mocap body
-        self.mocap_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, mocap_name)
-        if self.mocap_body_id == -1:
-            raise ValueError(f"[ERROR] Mocap target body '{mocap_name}' not found in XML.")
         
-        self.mocap_id = self.model.body_mocapid[self.mocap_body_id]
-        if self.mocap_id == -1:
-            raise ValueError(f"[ERROR] '{mocap_name}' is not configured as a mocap body (mocap=true).")
-            
-        print(f"[INFO] MuJoCo model loaded successfully. Mocap ID: {self.mocap_id}")
+        # Cache dictionaries to store resolved body and mocap IDs on the fly
+        self._body_ids = {}
+        self._mocap_ids = {}
 
-    def get_mocap_position(self) -> np.ndarray:
-        """Returns the current 3D position vector of the mocap target."""
-        return self.data.mocap_pos[self.mocap_id].copy()
+        # Resolve single-arm variables if legacy names are provided
+        if mocap_name:
+            self._resolve_mocap(mocap_name)
+        if ee_name:
+            self._resolve_body(ee_name)
 
-    def set_mocap_position(self, position: np.ndarray) -> None:
+    def _resolve_body(self, body_name: str) -> int:
+        """Resolves body name to its internal MuJoCo body ID and caches it."""
+        if body_name not in self._body_ids:
+            body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+            if body_id == -1:
+                raise ValueError(f"[ERROR] Body '{body_name}' not found in XML model.")
+            self._body_ids[body_name] = body_id
+        return self._body_ids[body_name]
+
+    def _resolve_mocap(self, mocap_name: str) -> int:
+        """Resolves mocap body name to its internal MuJoCo mocap ID and caches it."""
+        if mocap_name not in self._mocap_ids:
+            body_id = self._resolve_body(mocap_name)
+            mocap_id = self.model.body_mocapid[body_id]
+            if mocap_id == -1:
+                raise ValueError(f"[ERROR] '{mocap_name}' is not configured as a mocap body (mocap=true).")
+            self._mocap_ids[mocap_name] = mocap_id
+        return self._mocap_ids[mocap_name]
+
+    def get_mocap_position(self, mocap_name: str = "mocap_target") -> np.ndarray:
+        """Returns the current 3D position vector of the specified mocap target."""
+        mocap_id = self._resolve_mocap(mocap_name)
+        return self.data.mocap_pos[mocap_id].copy()
+
+    def set_mocap_position(self, mocap_name_or_pos, position: Optional[np.ndarray] = None) -> None:
         """
-        Updates the 3D position of the mocap target body in the simulation space.
+        Updates the 3D position of the specified mocap target body in the simulation space.
 
         Args:
-            position: 1D np.ndarray([x, y, z]) target coordinate in meters.
+            mocap_name_or_pos: Name of the mocap target (str), or position vector (legacy single-arm).
+            position: 1D np.ndarray([x, y, z]) target coordinate in meters (when named).
         """
-        self.data.mocap_pos[self.mocap_id] = position
+        if position is None:
+            # Legacy single-arm call: set_mocap_position(position)
+            mocap_name = "mocap_target"
+            pos = mocap_name_or_pos
+        else:
+            mocap_name = mocap_name_or_pos
+            pos = position
 
-    def get_ee_position(self) -> np.ndarray:
-        """Returns the current 3D position vector of the end-effector sphere."""
-        ee_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, self.ee_name)
-        if ee_body_id == -1:
-            raise ValueError(f"[ERROR] End-effector body '{self.ee_name}' not found in model.")
-        return self.data.xpos[ee_body_id].copy()
+        mocap_id = self._resolve_mocap(mocap_name)
+        self.data.mocap_pos[mocap_id] = pos
+
+    def get_ee_position(self, ee_name: str = "end_effector") -> np.ndarray:
+        """Returns the current 3D position vector of the specified end-effector body."""
+        body_id = self._resolve_body(ee_name)
+        return self.data.xpos[body_id].copy()
 
     def step(self, steps: int = 1) -> None:
         """

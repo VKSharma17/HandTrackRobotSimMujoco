@@ -32,21 +32,26 @@ ROBOT_CONFIGS = {
     },
     "franka_panda": {
         "model_path": "franka_panda.xml",
-        "mocap_name": "mocap_target",
-        "ee_name": "hand",
-        "workspace_center": (0.45, 0.0, 0.25),
+        "mocap_name_left": "mocap_target_left",
+        "mocap_name_right": "mocap_target_right",
+        "ee_name_left": "hand_left",
+        "ee_name_right": "hand_right",
+        "workspace_center_left": (0.45, 0.25, 0.25),
+        "workspace_center_right": (0.45, -0.25, 0.25),
         "scaling_factors": (0.8, 0.8, 3.0),
         "ref_mediapipe": (0.5, 0.5, -0.1),
         "bounds_x": (0.25, 0.65),
-        "bounds_y": (-0.3, 0.3),
+        "bounds_y_left": (-0.05, 0.55),
+        "bounds_y_right": (-0.55, 0.05),
         "bounds_z": (0.015, 0.5),
-        "gripper_actuators": ["finger_actuator1", "finger_actuator2"],
+        "gripper_actuators_left": ["finger_actuator1_left", "finger_actuator2_left"],
+        "gripper_actuators_right": ["finger_actuator1_right", "finger_actuator2_right"],
         "mocap_quat": (0.0, 1.0, 0.0, 0.0)
     }
 }
 
 def generate_franka_panda_xml(num_cubes: int) -> None:
-    """Generates franka_panda.xml dynamically with a variable number of randomized cubes."""
+    """Generates franka_panda.xml dynamically with a variable number of randomized cubes and two arms."""
     cube_colors = [
         "0.9 0.45 0.1 1.0",   # Orange
         "0.1 0.6 0.9 1.0",    # Blue
@@ -59,11 +64,11 @@ def generate_franka_panda_xml(num_cubes: int) -> None:
     positions = []
     attempts = 0
     # Generate non-overlapping random positions on the table surface (Z = 0.02)
-    # Table space bounds: X in [0.35, 0.55], Y in [-0.20, 0.20]
+    # Table space bounds: X in [0.35, 0.55], Y in [-0.35, 0.35]
     while len(positions) < num_cubes and attempts < 200:
         attempts += 1
         x = random.uniform(0.35, 0.55)
-        y = random.uniform(-0.18, 0.18)
+        y = random.uniform(-0.35, 0.35)
         
         too_close = False
         for px, py in positions:
@@ -77,7 +82,7 @@ def generate_franka_panda_xml(num_cubes: int) -> None:
     while len(positions) < num_cubes:
         i = len(positions)
         x = 0.35 + 0.05 * (i % 4)
-        y = -0.15 + 0.08 * (i // 4)
+        y = -0.25 + 0.1 * (i // 4)
         positions.append((x, y))
 
     cube_bodies_xml = ""
@@ -89,6 +94,78 @@ def generate_franka_panda_xml(num_cubes: int) -> None:
             <joint name="cube_joint_{i}" type="free"/>
             <geom name="cube_geom_{i}" type="box" size="0.02 0.02 0.02" rgba="{rgba}" mass="0.05" condim="6" friction="1.0 0.005 0.0001"/>
         </body>"""
+
+    def get_panda_arm_xml(suffix: str, base_pos: str) -> str:
+        return f"""
+        <!-- 7-DOF Franka Emika Panda Robot Arm ({suffix}) -->
+        <body name="base{suffix}" pos="{base_pos}">
+            <geom name="base_geom{suffix}" type="cylinder" size="0.075 0.05" pos="0 0 0.025" material="joint_material"/>
+            
+            <body name="link1{suffix}" pos="0 0 0.05">
+                <joint name="joint1{suffix}" type="hinge" axis="0 0 1" range="-166 166"/>
+                <geom name="link1_geom{suffix}" type="cylinder" size="0.06 0.14" pos="0 0 0.14"/>
+                
+                <body name="link2{suffix}" pos="0 0 0.28">
+                    <joint name="joint2{suffix}" type="hinge" axis="0 1 0" range="-101 101"/>
+                    <geom name="link2_geom{suffix}" type="box" size="0.05 0.05 0.1" pos="0 0 0.1"/>
+                    
+                    <body name="link3{suffix}" pos="0 0 0.2">
+                        <joint name="joint3{suffix}" type="hinge" axis="0 0 1" range="-166 166"/>
+                        <geom name="link3_geom{suffix}" type="cylinder" size="0.045 0.14" pos="0 0 0.14"/>
+                        
+                        <body name="link4{suffix}" pos="0 0 0.28">
+                            <joint name="joint4{suffix}" type="hinge" axis="0 -1 0" range="-176 0"/>
+                            <geom name="link4_geom{suffix}" type="box" size="0.04 0.04 0.1" pos="0 0 0.1"/>
+                            
+                            <body name="link5{suffix}" pos="0 0 0.2">
+                                <joint name="joint5{suffix}" type="hinge" axis="0 0 1" range="-166 166"/>
+                                <geom name="link5_geom{suffix}" type="cylinder" size="0.04 0.15" pos="0 0 0.15"/>
+                                
+                                <body name="link6{suffix}" pos="0 0 0.3">
+                                    <joint name="joint6{suffix}" type="hinge" axis="0 1 0" range="-5 215"/>
+                                    <geom name="link6_geom{suffix}" type="box" size="0.035 0.035 0.06" pos="0 0 0.06"/>
+                                    
+                                    <body name="link7{suffix}" pos="0 0 0.12">
+                                        <joint name="joint7{suffix}" type="hinge" axis="0 0 1" range="-166 166"/>
+                                        <geom name="link7_geom{suffix}" type="cylinder" size="0.035 0.04" pos="0 0 0.04" material="joint_material"/>
+                                        
+                                        <body name="hand{suffix}" pos="0 0 0.08">
+                                            <geom name="hand_geom{suffix}" type="box" size="0.04 0.06 0.03" pos="0 0 0.015" material="gripper_material"/>
+                                            
+                                            <body name="finger_left{suffix}" pos="0 0.02 0.03">
+                                                <joint name="finger_joint1{suffix}" type="slide" axis="0 1 0" range="0 0.04"/>
+                                                <geom name="finger_left_geom{suffix}" type="box" size="0.01 0.01 0.035" pos="0 0 0.035" material="panda_material" condim="4" friction="1.0 0.005 0.0001"/>
+                                            </body>
+                                            
+                                            <body name="finger_right{suffix}" pos="0 -0.02 0.03">
+                                                <joint name="finger_joint2{suffix}" type="slide" axis="0 -1 0" range="0 0.04"/>
+                                                <geom name="finger_right_geom{suffix}" type="box" size="0.01 0.01 0.035" pos="0 0 0.035" material="panda_material" condim="4" friction="1.0 0.005 0.0001"/>
+                                            </body>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+        </body>"""
+
+    def get_mocap_xml(suffix: str, init_pos: str) -> str:
+        return f"""
+        <!-- Mocap Target for {suffix} -->
+        <body name="mocap_target{suffix}" mocap="true" pos="{init_pos}">
+            <geom name="mocap_geom{suffix}" type="sphere" size="0.02" rgba="0 1 0 0.4" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.002" fromto="0 0 0 0.06 0 0" rgba="1 0 0 0.8" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.002" fromto="0 0 0 0 0.06 0" rgba="0 1 0 0.8" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.002" fromto="0 0 0 0 0 0.06" rgba="0 0 1 0.8" contype="0" conaffinity="0"/>
+        </body>"""
+
+    left_arm_xml = get_panda_arm_xml("_left", "0 0.25 0.0")
+    right_arm_xml = get_panda_arm_xml("_right", "0 -0.25 0.0")
+    
+    left_mocap_xml = get_mocap_xml("_left", "0.0 0.25 1.51")
+    right_mocap_xml = get_mocap_xml("_right", "0.0 -0.25 1.51")
 
     xml_content = f"""<mujoco model="franka_panda_teleop">
     <compiler angle="degree" coordinate="local"/>
@@ -116,83 +193,30 @@ def generate_franka_panda_xml(num_cubes: int) -> None:
 
         <!-- Manipulation Workspace Table (Surface at Z = 0) -->
         <body name="table" pos="0.45 0.0 0.0">
-            <geom name="table_top" type="box" size="0.25 0.35 0.01" pos="0 0 -0.01" rgba="0.25 0.25 0.25 1.0"/>
+            <geom name="table_top" type="box" size="0.25 0.50 0.01" pos="0 0 -0.01" rgba="0.25 0.25 0.25 1.0"/>
         </body>
 
         {cube_bodies_xml}
 
-        <!-- 7-DOF Franka Emika Panda Robot Arm -->
-        <body name="base" pos="0 0 0.0">
-            <geom name="base_geom" type="cylinder" size="0.075 0.05" pos="0 0 0.025" material="joint_material"/>
-            
-            <body name="link1" pos="0 0 0.05">
-                <joint name="joint1" type="hinge" axis="0 0 1" range="-166 166"/>
-                <geom name="link1_geom" type="cylinder" size="0.06 0.14" pos="0 0 0.14"/>
-                
-                <body name="link2" pos="0 0 0.28">
-                    <joint name="joint2" type="hinge" axis="0 1 0" range="-101 101"/>
-                    <geom name="link2_geom" type="box" size="0.05 0.05 0.1" pos="0 0 0.1"/>
-                    
-                    <body name="link3" pos="0 0 0.2">
-                        <joint name="joint3" type="hinge" axis="0 0 1" range="-166 166"/>
-                        <geom name="link3_geom" type="cylinder" size="0.045 0.14" pos="0 0 0.14"/>
-                        
-                        <body name="link4" pos="0 0 0.28">
-                            <joint name="joint4" type="hinge" axis="0 -1 0" range="-176 0"/>
-                            <geom name="link4_geom" type="box" size="0.04 0.04 0.1" pos="0 0 0.1"/>
-                            
-                            <body name="link5" pos="0 0 0.2">
-                                <joint name="joint5" type="hinge" axis="0 0 1" range="-166 166"/>
-                                <geom name="link5_geom" type="cylinder" size="0.04 0.15" pos="0 0 0.15"/>
-                                
-                                <body name="link6" pos="0 0 0.3">
-                                    <joint name="joint6" type="hinge" axis="0 1 0" range="-5 215"/>
-                                    <geom name="link6_geom" type="box" size="0.035 0.035 0.06" pos="0 0 0.06"/>
-                                    
-                                    <body name="link7" pos="0 0 0.12">
-                                        <joint name="joint7" type="hinge" axis="0 0 1" range="-166 166"/>
-                                        <geom name="link7_geom" type="cylinder" size="0.035 0.04" pos="0 0 0.04" material="joint_material"/>
-                                        
-                                        <body name="hand" pos="0 0 0.08">
-                                            <geom name="hand_geom" type="box" size="0.04 0.06 0.03" pos="0 0 0.015" material="gripper_material"/>
-                                            
-                                            <body name="finger_left" pos="0 0.02 0.03">
-                                                <joint name="finger_joint1" type="slide" axis="0 1 0" range="0 0.04"/>
-                                                <geom name="finger_left_geom" type="box" size="0.01 0.01 0.035" pos="0 0 0.035" material="panda_material" condim="4" friction="1.0 0.005 0.0001"/>
-                                            </body>
-                                            
-                                            <body name="finger_right" pos="0 -0.02 0.03">
-                                                <joint name="finger_joint2" type="slide" axis="0 -1 0" range="0 0.04"/>
-                                                <geom name="finger_right_geom" type="box" size="0.01 0.01 0.035" pos="0 0 0.035" material="panda_material" condim="4" friction="1.0 0.005 0.0001"/>
-                                            </body>
-                                        </body>
-                                    </body>
-                                </body>
-                            </body>
-                        </body>
-                    </body>
-                </body>
-            </body>
-        </body>
+        {left_arm_xml}
+        {right_arm_xml}
 
-        <!-- Mocap Target (Initial position Z = 1.51m) -->
-        <body name="mocap_target" mocap="true" pos="0.0 0.0 1.51">
-            <geom name="mocap_geom" type="sphere" size="0.02" rgba="0 1 0 0.4" contype="0" conaffinity="0"/>
-            <geom type="cylinder" size="0.002" fromto="0 0 0 0.06 0 0" rgba="1 0 0 0.8" contype="0" conaffinity="0"/>
-            <geom type="cylinder" size="0.002" fromto="0 0 0 0 0.06 0" rgba="0 1 0 0.8" contype="0" conaffinity="0"/>
-            <geom type="cylinder" size="0.002" fromto="0 0 0 0 0 0.06" rgba="0 0 1 0.8" contype="0" conaffinity="0"/>
-        </body>
+        {left_mocap_xml}
+        {right_mocap_xml}
     </worldbody>
 
-    <!-- Weld constraint to drag hand with mocap_target -->
+    <!-- Weld constraints to drag hands with mocaps -->
     <equality>
-        <weld name="teleop_weld" body1="hand" body2="mocap_target"/>
+        <weld name="teleop_weld_left" body1="hand_left" body2="mocap_target_left"/>
+        <weld name="teleop_weld_right" body1="hand_right" body2="mocap_target_right"/>
     </equality>
 
     <!-- Gripper position controllers -->
     <actuator>
-        <position name="finger_actuator1" joint="finger_joint1" ctrlrange="0 0.04" kp="100"/>
-        <position name="finger_actuator2" joint="finger_joint2" ctrlrange="0 0.04" kp="100"/>
+        <position name="finger_actuator1_left" joint="finger_joint1_left" ctrlrange="0 0.04" kp="100"/>
+        <position name="finger_actuator2_left" joint="finger_joint2_left" ctrlrange="0 0.04" kp="100"/>
+        <position name="finger_actuator1_right" joint="finger_joint1_right" ctrlrange="0 0.04" kp="100"/>
+        <position name="finger_actuator2_right" joint="finger_joint2_right" ctrlrange="0 0.04" kp="100"/>
     </actuator>
 </mujoco>"""
     with open("franka_panda.xml", "w") as f:
@@ -225,34 +249,76 @@ def main() -> None:
     # 1. Initialize Modules
     try:
         tracker = HandTracker(alpha=0.15)
-        transformer = SpatialTransformer(
-            workspace_center=config["workspace_center"],
-            scaling_factors=config["scaling_factors"],
-            ref_mediapipe=config["ref_mediapipe"],
-            bounds_x=config["bounds_x"],
-            bounds_y=config["bounds_y"],
-            bounds_z=config["bounds_z"]
-        )
-        sim = RobotSimulator(
-            model_path=config["model_path"],
-            mocap_name=config["mocap_name"],
-            ee_name=config["ee_name"]
-        )
-        if "mocap_quat" in config:
-            sim.data.mocap_quat[sim.mocap_id] = config["mocap_quat"]
+        is_dual = "mocap_name_left" in config
+        
+        if is_dual:
+            # Dual spatial transformers
+            transformers = {
+                "Left": SpatialTransformer(
+                    workspace_center=config["workspace_center_left"],
+                    scaling_factors=config["scaling_factors"],
+                    ref_mediapipe=config["ref_mediapipe"],
+                    bounds_x=config["bounds_x"],
+                    bounds_y=config["bounds_y_left"],
+                    bounds_z=config["bounds_z"]
+                ),
+                "Right": SpatialTransformer(
+                    workspace_center=config["workspace_center_right"],
+                    scaling_factors=config["scaling_factors"],
+                    ref_mediapipe=config["ref_mediapipe"],
+                    bounds_x=config["bounds_x"],
+                    bounds_y=config["bounds_y_right"],
+                    bounds_z=config["bounds_z"]
+                )
+            }
+            sim = RobotSimulator(model_path=config["model_path"])
+            if "mocap_quat" in config:
+                mocap_left_id = sim._resolve_mocap(config["mocap_name_left"])
+                mocap_right_id = sim._resolve_mocap(config["mocap_name_right"])
+                sim.data.mocap_quat[mocap_left_id] = config["mocap_quat"]
+                sim.data.mocap_quat[mocap_right_id] = config["mocap_quat"]
+                
+            actuator_ids = {"Left": [], "Right": []}
+            for side in ["Left", "Right"]:
+                key = f"gripper_actuators_{side.lower()}"
+                if key in config and config[key]:
+                    for act_name in config[key]:
+                        act_id = mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_ACTUATOR, act_name)
+                        if act_id == -1:
+                            print(f"[WARNING] Actuator '{act_name}' not found in model.")
+                        else:
+                            actuator_ids[side].append(act_id)
+        else:
+            # Single spatial transformer
+            transformer = SpatialTransformer(
+                workspace_center=config["workspace_center"],
+                scaling_factors=config["scaling_factors"],
+                ref_mediapipe=config["ref_mediapipe"],
+                bounds_x=config["bounds_x"],
+                bounds_y=config["bounds_y"],
+                bounds_z=config["bounds_z"]
+            )
+            sim = RobotSimulator(
+                model_path=config["model_path"],
+                mocap_name=config["mocap_name"],
+                ee_name=config["ee_name"]
+            )
+            if "mocap_quat" in config:
+                legacy_mocap_id = sim._resolve_mocap(config["mocap_name"])
+                sim.data.mocap_quat[legacy_mocap_id] = config["mocap_quat"]
+                
+            actuator_ids = []
+            if config["gripper_actuators"]:
+                for act_name in config["gripper_actuators"]:
+                    act_id = mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_ACTUATOR, act_name)
+                    if act_id == -1:
+                        print(f"[WARNING] Actuator '{act_name}' not found in model.")
+                    else:
+                        actuator_ids.append(act_id)
+                        
     except Exception as e:
         print(f"[CRITICAL] Initialization failed: {e}")
         sys.exit(1)
-
-    # Resolve gripper actuator IDs in MuJoCo if applicable
-    actuator_ids = []
-    if config["gripper_actuators"]:
-        for act_name in config["gripper_actuators"]:
-            act_id = mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_ACTUATOR, act_name)
-            if act_id == -1:
-                print(f"[WARNING] Actuator '{act_name}' not found in model.")
-            else:
-                actuator_ids.append(act_id)
 
     # 2. Initialize Camera Capture
     cap = cv2.VideoCapture(0)
@@ -268,10 +334,17 @@ def main() -> None:
     dt = sim.model.opt.timestep
     start_time = time.time()
     sim_start_time = sim.data.time
+    
     # Teleoperation state variables for bumpless initialization transfer
-    hand_was_lost = True
-    start_ee_pos = None
-    blend_weight = 1.0
+    if is_dual:
+        hand_was_lost = {"Left": True, "Right": True}
+        start_ee_pos = {"Left": None, "Right": None}
+        blend_weight = {"Left": 1.0, "Right": 1.0}
+    else:
+        hand_was_lost = True
+        start_ee_pos = None
+        blend_weight = 1.0
+        
     prev_loop_time = start_time
 
     print("[INFO] System running. Opening passive simulation viewer on GPU...")
@@ -291,86 +364,129 @@ def main() -> None:
                 frame = cv2.flip(frame, 1)
                 h, w, _ = frame.shape
 
-                # Step 1: Run CPU perception to obtain landmarks, thumb-index pinch, and palm scale
-                filtered_mp, raw_mp, pinch_dist, d_palm = tracker.process_frame(frame)
+                # Step 1: Run CPU perception to obtain hand landmark data dictionaries
+                hands_data = tracker.process_frame(frame)
 
-                if filtered_mp is not None:
-                    if hand_was_lost:
-                        # Capture the current physical position of the arm before tracking starts
-                        start_ee_pos = sim.get_ee_position()
-                        blend_weight = 1.0
-                        hand_was_lost = False
-
-                    # Step 2: Transform camera coordinates to MuJoCo workspace coordinates (meters)
-                    target_pos = transformer.transform(filtered_mp)
-
-                    # Apply smooth initialization blending (bumpless transfer) to avoid initial snap
-                    if blend_weight > 0.0:
-                        target_pos = (1.0 - blend_weight) * target_pos + blend_weight * start_ee_pos
-                        blend_weight = max(0.0, blend_weight - 0.05)  # Decrements over ~20 frames (~0.6s)
-
-                    # Step 3: Write mapped target directly to the simulator's mocap position
-                    sim.set_mocap_position(target_pos)
-
-                    # Step 4: Proportional Gripper Control
-                    if actuator_ids:
-                        # Map normalized pinch distance [0.05, 0.15] to actuator stroke [0.0 (closed), 0.04 (open)]
-                        # Proportional control enables picking with fine displacement
-                        gripper_ctrl = np.clip((pinch_dist - 0.05) / 0.10 * 0.04, 0.0, 0.04)
-                        for act_id in actuator_ids:
-                            sim.data.ctrl[act_id] = gripper_ctrl
-
-                    # Draw text feedback of coordinates in the OpenCV window
-                    ee_pos = sim.get_ee_position()
-                    tracking_err = np.linalg.norm(target_pos - ee_pos) * 1000.0
-                    
-                    cv2.putText(
-                        frame, f"Target Pos: [{target_pos[0]:.2f}, {target_pos[1]:.2f}, {target_pos[2]:.2f}] m", 
-                        (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2
-                    )
-                    cv2.putText(
-                        frame, f"EE Pos:     [{ee_pos[0]:.2f}, {ee_pos[1]:.2f}, {ee_pos[2]:.2f}] m", 
-                        (20, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2
-                    )
-                    cv2.putText(
-                        frame, f"Weld Lag:   {tracking_err:.1f} mm", 
-                        (20, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2
-                    )
-                    
-                    if actuator_ids:
-                        pinch_status = "CLOSED" if pinch_dist < 0.06 else "OPEN" if pinch_dist > 0.12 else f"PROP ({pinch_dist:.3f})"
-                        cv2.putText(
-                            frame, f"Gripper:     {pinch_status}", 
-                            (20, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2
-                        )
-                        
-                    # Calculate and display hand-to-camera distance (cm) and gripper height (cm)
-                    # Palm scale d_palm ranges from 0.09 (~100cm) to 0.22 (~41cm)
-                    hand_dist_cm = 9.0 / d_palm * 100.0 if d_palm > 0 else 100.0
-                    gripper_height_cm = ee_pos[2] * 100.0
-                    
-                    cv2.putText(
-                        frame, f"Hand Dist:   {hand_dist_cm:.1f} cm", 
-                        (20, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2
-                    )
-                    cv2.putText(
-                        frame, f"Gripper Z:   {gripper_height_cm:.1f} cm", 
-                        (20, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2
-                    )
+                if is_dual:
+                    # Bimanual Control Path
+                    for side in ["Left", "Right"]:
+                        if side in hands_data:
+                            hand_info = hands_data[side]
+                            filtered_mp = hand_info["filtered_pos"]
+                            pinch_dist = hand_info["pinch_dist"]
+                            d_palm = hand_info["d_palm"]
+                            
+                            if hand_was_lost[side]:
+                                ee_name = config["ee_name_left"] if side == "Left" else config["ee_name_right"]
+                                start_ee_pos[side] = sim.get_ee_position(ee_name)
+                                blend_weight[side] = 1.0
+                                hand_was_lost[side] = False
+                                
+                            # Step 2: Transform coordinates
+                            target_pos = transformers[side].transform(filtered_mp)
+                            
+                            # Apply bumpless transfer
+                            if blend_weight[side] > 0.0:
+                                target_pos = (1.0 - blend_weight[side]) * target_pos + blend_weight[side] * start_ee_pos[side]
+                                blend_weight[side] = max(0.0, blend_weight[side] - 0.05)
+                                
+                            # Step 3: Write mapped target directly to mocap
+                            mocap_name = config["mocap_name_left"] if side == "Left" else config["mocap_name_right"]
+                            sim.set_mocap_position(mocap_name, target_pos)
+                            
+                            # Step 4: Proportional Gripper Control
+                            if actuator_ids[side]:
+                                gripper_ctrl = np.clip((pinch_dist - 0.05) / 0.10 * 0.04, 0.0, 0.04)
+                                for act_id in actuator_ids[side]:
+                                    sim.data.ctrl[act_id] = gripper_ctrl
+                                    
+                            ee_name = config["ee_name_left"] if side == "Left" else config["ee_name_right"]
+                            ee_pos = sim.get_ee_position(ee_name)
+                            hand_dist_cm = 9.0 / d_palm * 100.0 if d_palm > 0 else 100.0
+                            
+                            # Visual overlays per side
+                            y_start = 80 if side == "Left" else 150
+                            cv2.putText(
+                                frame, f"{side} Tar: [{target_pos[0]:.2f}, {target_pos[1]:.2f}, {target_pos[2]:.2f}] m", 
+                                (20, y_start), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2
+                            )
+                            cv2.putText(
+                                frame, f"{side} EE:  [{ee_pos[0]:.2f}, {ee_pos[1]:.2f}, {ee_pos[2]:.2f}] m", 
+                                (20, y_start + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2
+                            )
+                            pinch_status = "CLOSED" if pinch_dist < 0.15 else "OPEN" if pinch_dist > 0.18 else f"PROP ({pinch_dist:.2f})"
+                            cv2.putText(
+                                frame, f"{side} Grip: {pinch_status} | Dist: {hand_dist_cm:.1f} cm", 
+                                (20, y_start + 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2
+                            )
+                        else:
+                            hand_was_lost[side] = True
+                            y_start = 80 if side == "Left" else 150
+                            cv2.putText(
+                                frame, f"{side} hand lost - holding position", 
+                                (20, y_start), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2
+                            )
                 else:
-                    hand_was_lost = True
-                    cv2.putText(
-                        frame, "Hand lost - holding position", 
-                        (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2
-                    )
+                    # Single-Arm Control Path
+                    # Fetch whichever hand is currently visible
+                    hand_info = None
+                    for side in ["Right", "Left"]:
+                        if side in hands_data:
+                            hand_info = hands_data[side]
+                            break
 
-                # Step 5: Step MuJoCo physics simulation to sync with real elapsed time
+                    if hand_info is not None:
+                        filtered_mp = hand_info["filtered_pos"]
+                        pinch_dist = hand_info["pinch_dist"]
+                        d_palm = hand_info["d_palm"]
+                        
+                        if hand_was_lost:
+                            start_ee_pos = sim.get_ee_position(config["ee_name"])
+                            blend_weight = 1.0
+                            hand_was_lost = False
+
+                        # Step 2: Transform coordinates
+                        target_pos = transformer.transform(filtered_mp)
+
+                        # Apply smooth initialization blending
+                        if blend_weight > 0.0:
+                            target_pos = (1.0 - blend_weight) * target_pos + blend_weight * start_ee_pos
+                            blend_weight = max(0.0, blend_weight - 0.05)
+
+                        # Step 3: Write mapped target directly to mocap
+                        sim.set_mocap_position(config["mocap_name"], target_pos)
+
+                        # Step 4: Proportional Gripper Control
+                        if actuator_ids:
+                            gripper_ctrl = np.clip((pinch_dist - 0.05) / 0.10 * 0.04, 0.0, 0.04)
+                            for act_id in actuator_ids:
+                                sim.data.ctrl[act_id] = gripper_ctrl
+
+                        ee_pos = sim.get_ee_position(config["ee_name"])
+                        hand_dist_cm = 9.0 / d_palm * 100.0 if d_palm > 0 else 100.0
+
+                        cv2.putText(
+                            frame, f"Target Pos: [{target_pos[0]:.2f}, {target_pos[1]:.2f}, {target_pos[2]:.2f}] m", 
+                            (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2
+                        )
+                        cv2.putText(
+                            frame, f"EE Pos:     [{ee_pos[0]:.2f}, {ee_pos[1]:.2f}, {ee_pos[2]:.2f}] m", 
+                            (20, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2
+                        )
+                    else:
+                        hand_was_lost = True
+                        cv2.putText(
+                            frame, "Hand lost - holding position", 
+                            (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2
+                        )
+
+                # Step 5: Step physics simulation to sync with real elapsed time
                 elapsed = time.time() - start_time
                 steps_needed = int((elapsed - (sim.data.time - sim_start_time)) / dt)
                 if steps_needed > 0:
                     sim.step(steps=steps_needed)
 
-                # Compute loop FPS (camera frame processing speed)
+                # Compute loop FPS
                 curr_time = time.time()
                 fps = 1.0 / (curr_time - prev_loop_time)
                 prev_loop_time = curr_time

@@ -1,16 +1,17 @@
-# Task Progress
+# Task Progress - Dual-Arm Bimanual Teleoperation
 
-- `[x]` Phase 1: Core Modular Real-Time Pipeline (Completed)
-  - `[x]` Module 1: Perception Engine (`hand_tracker.py`)
-  - `[x]` Module 2: Kinematic Spatial Bridge (`spatial_transformer.py`)
-  - `[x]` Module 3: Physics Simulator (`robot_sim.py`)
-  - `[x]` Module 4: System Integrator (`main.py`)
-- `[x]` Phase 2: High-Fidelity Robot Teleoperation & Manipulation
-  - `[x]` Create meshless 7-DOF `franka_panda.xml` with table, cube, actuators, and mocap weld constraint.
-  - `[x]` Update `hand_tracker.py` to track index-to-thumb pinch distance & render connection lines.
-  - `[x]` Update `main.py` with plug-and-play robot config dictionary and proportional gripper control.
-  - `[x]` Verify picking, lifting, and placing the cube in simulation.
-  - `[x]` Update background `README.md` and walkthrough.
-- `[x]` Bug Fixes
-  - `[x]` Fix `ValueError: not enough values to unpack (expected 4, got 3)` in `hand_tracker.py`
-  - `[x]` Fix `NameError: name 'prev_loop_time' is not defined` in `main.py`
+- `[x]` Module 1: Dual-Hand Perception Engine (`hand_tracker.py`)
+  - `[x]` Configure tracker for up to two hands (`num_hands=2`)
+  - `[x]` Implement separate filter states for left/right hands
+  - `[x]` Implement mirrored handedness logic (MediaPipe -> Physical mapping)
+  - `[x]` Reformat return signature of `process_frame()` to dictionary mapping
+- `[x]` Module 3: Generic Physics Simulator (`robot_sim.py`)
+  - `[x]` Support tracking multiple mocaps and end-effectors via list/dict caches
+- `[x]` Module 4: Dual-Arm System Integrator (`main.py`)
+  - `[x]` Update XML generator to construct dual Franka Panda arms
+  - `[x]` Configure dual spatial transformers with independent offsets
+  - `[x]` Set up separate bumpless transfer blending logic for both arms
+  - `[x]` Implement synchronous control loops for left and right arm target tracking
+  - `[x]` Update OpenCV text overlays to display metrics for both arms
+- `[/]` Verification
+  - `[ ]` Verify successful dual-arm tracking and independent hand gestures
