@@ -10,8 +10,8 @@ from spatial_transformer import SpatialTransformer
 from robot_sim import RobotSimulator
 
 # Define the plug-and-play robot model selector
-# Options: "simple_arm", "franka_panda"
-ROBOT_NAME = "franka_panda_industrial"
+# Options: "simple_arm", "franka_panda_geometric", "franka_panda_industrial", "shadow_hand_dual"
+ROBOT_NAME = "shadow_hand_dual"
 
 # Variable control for number of pick-up objects in the scene
 NUM_CUBES = 5
@@ -65,6 +65,22 @@ ROBOT_CONFIGS = {
         "gripper_actuators_left": ["finger_actuator1_left", "finger_actuator2_left"],
         "gripper_actuators_right": ["finger_actuator1_right", "finger_actuator2_right"],
         "mocap_quat": (0.0, 1.0, 0.0, 0.0)
+    },
+    "shadow_hand_dual": {
+        "model_path": "shadow_hand_dual.xml",
+        "mocap_name_left": "mocap_target_left",
+        "mocap_name_right": "mocap_target_right",
+        "ee_name_left": "lh_forearm",
+        "ee_name_right": "rh_forearm",
+        "workspace_center_left": (0.25, 0.25, 0.20),
+        "workspace_center_right": (0.25, -0.25, 0.20),
+        "scaling_factors": (0.8, 0.8, 3.0),
+        "ref_mediapipe": (0.5, 0.5, -0.1),
+        "bounds_x": (0.10, 0.55),
+        "bounds_y_left": (-0.05, 0.55),
+        "bounds_y_right": (-0.55, 0.05),
+        "bounds_z": (0.015, 0.65),
+        "mocap_quat": (1.0, 0.0, 0.0, 0.0)
     }
 }
 
@@ -441,6 +457,281 @@ def generate_franka_panda_industrial_xml(num_cubes: int) -> None:
         print(f"[ERROR] Failed to compile XML tree for industrial model: {e}")
         raise e
 
+def generate_shadow_hand_dual_xml(num_cubes: int) -> None:
+    """
+    Checks if shadow_hand assets are downloaded; if not, fetches them.
+    Parses left_hand.xml and right_hand.xml to construct a dual-hand simulation.
+    """
+    import urllib.request
+    import xml.etree.ElementTree as ET
+    import os
+    import re
+
+    base_dir = "shadow_hand"
+    left_xml_path = os.path.join(base_dir, "left_hand.xml")
+    right_xml_path = os.path.join(base_dir, "right_hand.xml")
+    assets_dir = os.path.join(base_dir, "assets")
+    
+    if not os.path.exists(right_xml_path) or not os.path.exists(left_xml_path):
+        print("[INFO] MuJoCo Menagerie Shadow Hand model not found locally. Starting automatic download...")
+        os.makedirs(assets_dir, exist_ok=True)
+        base_url = "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main/shadow_hand/"
+        
+        try:
+            for name in ["right_hand.xml", "left_hand.xml"]:
+                dest = os.path.join(base_dir, name)
+                print(f"[INFO] Downloading {base_url}{name} -> {dest}")
+                urllib.request.urlretrieve(base_url + name, dest)
+                
+            with open(right_xml_path, "r", encoding="utf-8") as f:
+                xml_content = f.read()
+                
+            mesh_files = re.findall(r'file="([^"]+)"', xml_content)
+            mesh_files = sorted(list(set(mesh_files)))
+            
+            print(f"[INFO] Downloading {len(mesh_files)} mesh files from Menagerie...")
+            for idx, mesh in enumerate(mesh_files):
+                mesh_url = base_url + "assets/" + mesh
+                dest_path = os.path.join(assets_dir, mesh)
+                print(f"[{idx+1}/{len(mesh_files)}] Downloading: {mesh}")
+                urllib.request.urlretrieve(mesh_url, dest_path)
+            print("[INFO] Shadow Hand model assets downloaded successfully.")
+        except Exception as e:
+            print(f"[ERROR] Failed to download Shadow Hand assets: {e}")
+            raise e
+
+    try:
+        def prefix_classes_and_materials(el, prefix):
+            if "class" in el.attrib:
+                el.attrib["class"] = prefix + el.attrib["class"]
+            if "childclass" in el.attrib:
+                el.attrib["childclass"] = prefix + el.attrib["childclass"]
+            if "material" in el.attrib:
+                el.attrib["material"] = prefix + el.attrib["material"]
+            if el.tag == "material" and "name" in el.attrib:
+                el.attrib["name"] = prefix + el.attrib["name"]
+            for child in el:
+                prefix_classes_and_materials(child, prefix)
+
+        left_tree = ET.parse(left_xml_path)
+        left_root = left_tree.getroot()
+        
+        right_tree = ET.parse(right_xml_path)
+        right_root = right_tree.getroot()
+        
+        prefix_classes_and_materials(left_root, "lh_")
+        prefix_classes_and_materials(right_root, "rh_")
+        
+        left_default = left_root.find("default")
+        right_default = right_root.find("default")
+        
+        left_asset = left_root.find("asset")
+        right_asset = right_root.find("asset")
+        
+        left_wb = left_root.find("worldbody")
+        right_wb = right_root.find("worldbody")
+        
+        left_hand_body = left_wb.find("body")
+        right_hand_body = right_wb.find("body")
+        
+        left_hand_body.attrib["pos"] = "0 0.25 0.2"
+        left_hand_body.attrib["quat"] = "1 0 0 0"
+        
+        right_hand_body.attrib["pos"] = "0 -0.25 0.2"
+        right_hand_body.attrib["quat"] = "1 0 0 0"
+        
+        left_contact = left_root.find("contact")
+        right_contact = right_root.find("contact")
+        
+        left_tendon = left_root.find("tendon")
+        right_tendon = right_root.find("tendon")
+        
+        left_actuator = left_root.find("actuator")
+        right_actuator = right_root.find("actuator")
+        
+        left_def_str = ET.tostring(left_default, encoding="utf-8").decode("utf-8") if left_default is not None else ""
+        right_def_str = ET.tostring(right_default, encoding="utf-8").decode("utf-8") if right_default is not None else ""
+        
+        unique_meshes = {}
+        unique_materials = {}
+        
+        for asset_el in [left_asset, right_asset]:
+            if asset_el is not None:
+                for child in asset_el:
+                    if child.tag == "mesh":
+                        file_name = child.attrib.get("file")
+                        unique_meshes[file_name] = child
+                    elif child.tag == "material":
+                        mat_name = child.attrib.get("name")
+                        unique_materials[mat_name] = child
+                        
+        for file_name in unique_meshes.keys():
+            mesh_dest = os.path.join(assets_dir, file_name)
+            if not os.path.exists(mesh_dest):
+                mesh_url = base_url + "assets/" + file_name
+                print(f"[INFO] Downloading mesh {mesh_url} -> {mesh_dest}")
+                urllib.request.urlretrieve(mesh_url, mesh_dest)
+                        
+        # Customize left hand materials for high visual clarity (vibrant electric blue)
+        if "lh_black" in unique_materials:
+            unique_materials["lh_black"].attrib.update({
+                "rgba": "0.15 0.55 0.95 1.0",
+                "specular": "0.7",
+                "shininess": "0.6"
+            })
+        if "lh_gray" in unique_materials:
+            unique_materials["lh_gray"].attrib.update({
+                "rgba": "0.85 0.9 0.95 1.0",
+                "specular": "0.3",
+                "shininess": "0.3"
+            })
+        if "lh_metallic" in unique_materials:
+            unique_materials["lh_metallic"].attrib.update({
+                "rgba": "0.9 0.95 1.0 1.0",
+                "specular": "1.0",
+                "shininess": "0.9"
+            })
+
+        # Customize right hand materials for high visual clarity (vibrant coral orange)
+        if "rh_black" in unique_materials:
+            unique_materials["rh_black"].attrib.update({
+                "rgba": "0.95 0.4 0.15 1.0",
+                "specular": "0.7",
+                "shininess": "0.6"
+            })
+        if "rh_gray" in unique_materials:
+            unique_materials["rh_gray"].attrib.update({
+                "rgba": "0.95 0.9 0.85 1.0",
+                "specular": "0.3",
+                "shininess": "0.3"
+            })
+        if "rh_metallic" in unique_materials:
+            unique_materials["rh_metallic"].attrib.update({
+                "rgba": "1.0 0.95 0.9 1.0",
+                "specular": "1.0",
+                "shininess": "0.9"
+            })
+
+        asset_str = "<asset>\n"
+        for mat in unique_materials.values():
+            asset_str += "    " + ET.tostring(mat, encoding="utf-8").decode("utf-8") + "\n"
+        for mesh in unique_meshes.values():
+            asset_str += "    " + ET.tostring(mesh, encoding="utf-8").decode("utf-8") + "\n"
+        asset_str += "</asset>"
+        
+        left_hand_str = ET.tostring(left_hand_body, encoding="utf-8").decode("utf-8")
+        right_hand_str = ET.tostring(right_hand_body, encoding="utf-8").decode("utf-8")
+        
+        contact_str = ""
+        if left_contact is not None or right_contact is not None:
+            contact_str = "<contact>\n"
+            for contact_el in [left_contact, right_contact]:
+                if contact_el is not None:
+                    for child in contact_el:
+                        contact_str += "    " + ET.tostring(child, encoding="utf-8").decode("utf-8") + "\n"
+            contact_str += "</contact>"
+            
+        tendon_str = ""
+        if left_tendon is not None or right_tendon is not None:
+            tendon_str = "<tendon>\n"
+            for tendon_el in [left_tendon, right_tendon]:
+                if tendon_el is not None:
+                    for child in tendon_el:
+                        tendon_str += "    " + ET.tostring(child, encoding="utf-8").decode("utf-8") + "\n"
+            tendon_str += "</tendon>"
+            
+        actuator_str = ""
+        if left_actuator is not None or right_actuator is not None:
+            actuator_str = "<actuator>\n"
+            for actuator_el in [left_actuator, right_actuator]:
+                if actuator_el is not None:
+                    for child in actuator_el:
+                        actuator_str += "    " + ET.tostring(child, encoding="utf-8").decode("utf-8") + "\n"
+            actuator_str += "</actuator>"
+            
+        cube_colors = [
+            "0.9 0.45 0.1 1.0", "0.1 0.6 0.9 1.0", "0.8 0.1 0.8 1.0",
+            "0.9 0.9 0.1 1.0", "0.1 0.8 0.5 1.0", "0.8 0.2 0.2 1.0"
+        ]
+        positions = []
+        for i in range(num_cubes):
+            x = 0.35 + 0.05 * (i % 4)
+            y = -0.15 + 0.08 * (i // 4)
+            positions.append((x, y))
+            
+        cube_bodies_xml = ""
+        for i, (x, y) in enumerate(positions):
+            rgba = cube_colors[i % len(cube_colors)]
+            cube_bodies_xml += f"""
+        <!-- Manipulation Cube Object {i} -->
+        <body name="cube_{i}" pos="{x:.3f} {y:.3f} 0.02">
+            <joint name="cube_joint_{i}" type="free"/>
+            <geom name="cube_geom_{i}" type="box" size="0.02 0.02 0.02" rgba="{rgba}" mass="0.05" condim="6" friction="1.0 0.005 0.0001"/>
+        </body>"""
+
+        xml_content = f"""<mujoco model="shadow_hands_dual_teleop">
+    <compiler angle="radian" meshdir="shadow_hand/assets" autolimits="true"/>
+    <option integrator="implicitfast" timestep="0.002"/>
+    
+    {left_def_str}
+    {right_def_str}
+    
+    {asset_str}
+    
+    <worldbody>
+        <!-- Ambient and multi-directional studio lighting to eliminate dark shadows and highlight hand shape/details -->
+        <light pos="0 0 3" dir="0 0 -1" directional="true" castshadow="true" diffuse="0.7 0.7 0.7" specular="0.3 0.3 0.3"/>
+        <light pos="-1 1 2.5" dir="1 -1 -1.5" directional="true" diffuse="0.4 0.4 0.4" specular="0.1 0.1 0.1" castshadow="false"/>
+        <light pos="1 -1 2.5" dir="-1 1 -1.5" directional="true" diffuse="0.4 0.4 0.4" specular="0.1 0.1 0.1" castshadow="false"/>
+        <light pos="0 0 0.5" dir="0 0 1" directional="false" diffuse="0.15 0.15 0.15" castshadow="false"/>
+
+        <geom name="floor" type="plane" size="2 2 0.1" rgba="0.25 0.25 0.25 1.0"/>
+        
+        <!-- Table (warm light blue-grey for optimal hand contrast) -->
+        <body name="table" pos="0.45 0.0 0.0">
+            <geom name="table_top" type="box" size="0.25 0.50 0.01" pos="0 0 -0.01" rgba="0.70 0.75 0.80 1.0"/>
+        </body>
+        
+        {cube_bodies_xml}
+        
+        {left_hand_str}
+        {right_hand_str}
+        
+        <!-- Left Mocap Target -->
+        <body name="mocap_target_left" mocap="true" pos="0.0 0.25 0.2">
+            <geom name="mocap_geom_left" type="sphere" size="0.02" rgba="0 1 0 0.4" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.002" fromto="0 0 0 0.06 0 0" rgba="1 0 0 0.8" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.002" fromto="0 0 0 0 0.06 0" rgba="0 1 0 0.8" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.002" fromto="0 0 0 0 0 0.06" rgba="0 0 1 0.8" contype="0" conaffinity="0"/>
+        </body>
+        
+        <!-- Right Mocap Target -->
+        <body name="mocap_target_right" mocap="true" pos="0.0 -0.25 0.2">
+            <geom name="mocap_geom_right" type="sphere" size="0.02" rgba="0 1 0 0.4" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.002" fromto="0 0 0 0.06 0 0" rgba="1 0 0 0.8" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.002" fromto="0 0 0 0 0.06 0" rgba="0 1 0 0.8" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.002" fromto="0 0 0 0 0 0.06" rgba="0 0 1 0.8" contype="0" conaffinity="0"/>
+        </body>
+    </worldbody>
+    
+    <!-- Weld constraints to drag forearms with mocaps -->
+    <equality>
+        <weld name="teleop_weld_left" body1="lh_forearm" body2="mocap_target_left" relpose="0 0 0 1 0 0 0" solimp="0.9 0.95 0.001" solref="0.02 1"/>
+        <weld name="teleop_weld_right" body1="rh_forearm" body2="mocap_target_right" relpose="0 0 0 1 0 0 0" solimp="0.9 0.95 0.001" solref="0.02 1"/>
+    </equality>
+    
+    {contact_str}
+    {tendon_str}
+    {actuator_str}
+</mujoco>"""
+
+        with open("shadow_hand_dual.xml", "w", encoding="utf-8") as f:
+            f.write(xml_content)
+        print("[INFO] Generated shadow_hand_dual.xml with dual Shadow Hands.")
+    except Exception as e:
+        print(f"[ERROR] Failed to compile XML tree for Shadow Hands: {e}")
+        raise e
+
 def main() -> None:
     """
     Module 4: System Integrator
@@ -468,6 +759,12 @@ def main() -> None:
             generate_franka_panda_industrial_xml(NUM_CUBES)
         except Exception as e:
             print(f"[ERROR] Failed to dynamically generate industrial Panda XML: {e}")
+            sys.exit(1)
+    elif ROBOT_NAME == "shadow_hand_dual":
+        try:
+            generate_shadow_hand_dual_xml(NUM_CUBES)
+        except Exception as e:
+            print(f"[ERROR] Failed to dynamically generate Shadow Hand XML: {e}")
             sys.exit(1)
 
     # 1. Initialize Modules
@@ -502,6 +799,35 @@ def main() -> None:
                 sim.data.mocap_quat[mocap_left_id] = config["mocap_quat"]
                 sim.data.mocap_quat[mocap_right_id] = config["mocap_quat"]
                 
+            shadow_actuators = {"Left": {}, "Right": {}}
+            if ROBOT_NAME == "shadow_hand_dual":
+                for side in ["Left", "Right"]:
+                    prefix_act = "lh_A_" if side == "Left" else "rh_A_"
+                    shadow_actuators[side] = {
+                        "index": [
+                            mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{prefix_act}FFJ3"),
+                            mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{prefix_act}FFJ0")
+                        ],
+                        "middle": [
+                            mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{prefix_act}MFJ3"),
+                            mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{prefix_act}MFJ0")
+                        ],
+                        "ring": [
+                            mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{prefix_act}RFJ3"),
+                            mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{prefix_act}RFJ0")
+                        ],
+                        "pinky": [
+                            mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{prefix_act}LFJ3"),
+                            mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{prefix_act}LFJ0"),
+                            mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{prefix_act}LFJ5")
+                        ],
+                        "thumb": [
+                            mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{prefix_act}THJ4"),
+                            mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{prefix_act}THJ2"),
+                            mujoco.mj_name2id(sim.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{prefix_act}THJ1")
+                        ]
+                    }
+                    
             actuator_ids = {"Left": [], "Right": []}
             for side in ["Left", "Right"]:
                 key = f"gripper_actuators_{side.lower()}"
@@ -561,6 +887,8 @@ def main() -> None:
                 if jid != -1:
                     qadr = sim.model.jnt_qposadr[jid]
                     sim.data.qpos[qadr] = home_val[i]
+            mujoco.mj_forward(sim.model, sim.data)
+        elif ROBOT_NAME == "shadow_hand_dual":
             mujoco.mj_forward(sim.model, sim.data)
                         
     except Exception as e:
@@ -641,8 +969,16 @@ def main() -> None:
                             mocap_name = config["mocap_name_left"] if side == "Left" else config["mocap_name_right"]
                             sim.set_mocap_position(mocap_name, target_pos)
                             
-                            # Step 4: Proportional Gripper Control
-                            if actuator_ids[side]:
+                            # Step 4: Gripper / Finger Actuator Control
+                            if ROBOT_NAME == "shadow_hand_dual":
+                                flexions = hand_info["flexions"]
+                                for finger, act_list in shadow_actuators[side].items():
+                                    flex_val = flexions[finger]
+                                    for act_id in act_list:
+                                        if act_id != -1:
+                                            ctrl_range = sim.model.actuator_ctrlrange[act_id]
+                                            sim.data.ctrl[act_id] = ctrl_range[0] + flex_val * (ctrl_range[1] - ctrl_range[0])
+                            elif actuator_ids[side]:
                                 gripper_ctrl = np.clip((pinch_dist - 0.05) / 0.10 * 0.04, 0.0, 0.04)
                                 for act_id in actuator_ids[side]:
                                     sim.data.ctrl[act_id] = gripper_ctrl
@@ -661,11 +997,19 @@ def main() -> None:
                                 frame, f"{side} EE:  [{ee_pos[0]:.2f}, {ee_pos[1]:.2f}, {ee_pos[2]:.2f}] m", 
                                 (20, y_start + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2
                             )
-                            pinch_status = "CLOSED" if pinch_dist < 0.15 else "OPEN" if pinch_dist > 0.18 else f"PROP ({pinch_dist:.2f})"
-                            cv2.putText(
-                                frame, f"{side} Grip: {pinch_status} | Dist: {hand_dist_cm:.1f} cm", 
-                                (20, y_start + 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2
-                            )
+                            if ROBOT_NAME == "shadow_hand_dual":
+                                flexions = hand_info["flexions"]
+                                grip_info = f"I:{flexions['index']:.1f} M:{flexions['middle']:.1f} R:{flexions['ring']:.1f} P:{flexions['pinky']:.1f} T:{flexions['thumb']:.1f}"
+                                cv2.putText(
+                                    frame, f"{side} Fingers: {grip_info}", 
+                                    (20, y_start + 40), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA
+                                )
+                            else:
+                                pinch_status = "CLOSED" if pinch_dist < 0.15 else "OPEN" if pinch_dist > 0.18 else f"PROP ({pinch_dist:.2f})"
+                                cv2.putText(
+                                    frame, f"{side} Grip: {pinch_status} | Dist: {hand_dist_cm:.1f} cm", 
+                                    (20, y_start + 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2
+                                )
                         else:
                             hand_was_lost[side] = True
                             y_start = 80 if side == "Left" else 150

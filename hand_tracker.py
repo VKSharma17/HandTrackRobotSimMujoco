@@ -186,12 +186,29 @@ class HandTracker:
             else:
                 self._filtered_pos[hand_label] = self.alpha * raw_pos + (1.0 - self.alpha) * self._filtered_pos[hand_label]
 
+            # Extract landmarks for 3D coordinates (tip vs mcp) and compute relative flexion
+            def get_finger_flexion(tip_idx, mcp_idx, open_val, close_val):
+                t_pos = np.array([hand_landmarks[tip_idx].x, hand_landmarks[tip_idx].y, hand_landmarks[tip_idx].z])
+                m_pos = np.array([hand_landmarks[mcp_idx].x, hand_landmarks[mcp_idx].y, hand_landmarks[mcp_idx].z])
+                dist = np.linalg.norm(t_pos - m_pos)
+                dist_rel = dist / d_palm if d_palm > 0 else dist
+                return float(np.clip((open_val - dist_rel) / (open_val - close_val), 0.0, 1.0))
+                
+            flexions = {
+                "thumb": get_finger_flexion(4, 2, 0.90, 0.35),
+                "index": get_finger_flexion(8, 5, 1.10, 0.30),
+                "middle": get_finger_flexion(12, 9, 1.20, 0.30),
+                "ring": get_finger_flexion(16, 13, 1.10, 0.30),
+                "pinky": get_finger_flexion(20, 17, 1.00, 0.30)
+            }
+
             # Populate hand data
             hands_data[hand_label] = {
                 "filtered_pos": self._filtered_pos[hand_label].copy(),
                 "raw_pos": raw_pos.copy(),
                 "pinch_dist": pinch_distance,
-                "d_palm": d_palm
+                "d_palm": d_palm,
+                "flexions": flexions
             }
 
         # Reset any hands that were not detected in this frame

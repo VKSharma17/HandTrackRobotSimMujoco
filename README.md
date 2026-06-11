@@ -1,8 +1,11 @@
 # Real-Time 3D Hand Teleoperated Robot Simulation in MuJoCo
 
-A high-performance, modular, real-time physical AI pipeline that tracks human hand movements in 3D using a standard webcam (via **MediaPipe Hands** on CPU) and translates them into smooth teleoperation control inputs for a simulated robot arm in **MuJoCo** (on GPU).
+A high-performance, modular, real-time physical AI pipeline that tracks human hand movements in 3D using a standard webcam (via **MediaPipe Hands** on CPU) and translates them into smooth teleoperation control inputs for simulated robotic platforms in **MuJoCo** (on GPU).
 
-Developed to run at **60 FPS** with low latency, featuring support for both a 6-DOF simple arm and a 7-DOF **Franka Emika Panda** robot with parallel sliding jaws.
+Developed to run at **60 FPS** with low latency, featuring support for:
+- A 6-DOF **Simple Arm** (geometric)
+- A 7-DOF **Franka Emika Panda** robot arm (in geometric and high-fidelity industrial variants)
+- A dual-arm bimanual setup of **Shadow Hands** (E3M5 model, 48 total DOFs)
 
 ---
 
@@ -71,14 +74,32 @@ The Perception Engine requires the pre-trained MediaPipe Hand Landmarker model. 
 
 ## 🎮 Running the Simulation
 
-### Integrated Teleoperation (Default: Franka Panda)
-Run the main pipeline orchestrator:
+### Selecting the Robot Configuration
+You can switch between different robot models by editing the `ROBOT_NAME` variable at the top of [main.py](file:///d:/VKS/VKSLearn/HandRobotSimMujoco/main.py):
+```python
+# Options: "simple_arm", "franka_panda_geometric", "franka_panda_industrial", "shadow_hand_dual"
+ROBOT_NAME = "shadow_hand_dual"
+```
+
+### Running the Orchestrator
+Execute the main script:
 ```bash
 python main.py
 ```
-- **Control**: Move your hand left/right to move the robot left/right. Move your hand closer to the camera to descend, and further away to rise.
-- **Gripper**: Pinch your thumb and index finger together to close the gripper jaws on the cubes, and release to open.
-- **Exit**: Press `q` in the webcam frame or close the MuJoCo window to exit.
+
+### Control Scheme by Configuration
+
+#### 1. Franka Panda / Simple Arm (Single-Hand Control)
+- **Arm translation**: Move your hand in 3D space. Left/right/up/down maps to 3D space, and palm scale (distance to camera) maps to Z (depth).
+- **Gripper control**: Pinch your thumb and index finger to close/open the gripper jaws.
+
+#### 2. Bimanual Shadow Hands (`shadow_hand_dual`)
+- **Bimanual wrist tracking**: Both left and right hands are tracked independently using 3D coordinate mapping. Moving your hands translates the left/right Shadow Hands in the simulation.
+- **Dexterous finger flexion**: For each hand, MediaPipe tracks all 5 fingers. The perception engine computes normalized 3D flexion/curling metrics (0.0 for open, 1.0 for closed) which are mapped directly to the 40 independent position actuators of the simulated hands.
+- **Object interaction**: You can use fingers to curl, pinch, and manipulate objects (e.g., cubes) in the simulation.
+
+#### General Controls
+- **Exit**: Press `q` in the camera/CV2 window or close the MuJoCo window to exit.
 
 ### Running Individual Module Tests
 You can verify each system layer independently:

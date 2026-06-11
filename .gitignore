@@ -25,6 +25,8 @@ pip-delete-this-directory.txt
 # franka_panda.xml
 # franka_panda_industrial.xml
 # franka_emika_panda/
+# shadow_hand_dual.xml
+# shadow_hand/
 
 # Large Binary Model Files
 # (Download instructions are provided in the README)
