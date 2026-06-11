@@ -1,17 +1,16 @@
-# Task Progress - Dual-Arm Bimanual Teleoperation
+# Task Progress - Industrial Franka Panda Integration
 
-- `[x]` Module 1: Dual-Hand Perception Engine (`hand_tracker.py`)
-  - `[x]` Configure tracker for up to two hands (`num_hands=2`)
-  - `[x]` Implement separate filter states for left/right hands
-  - `[x]` Implement mirrored handedness logic (MediaPipe -> Physical mapping)
-  - `[x]` Reformat return signature of `process_frame()` to dictionary mapping
-- `[x]` Module 3: Generic Physics Simulator (`robot_sim.py`)
-  - `[x]` Support tracking multiple mocaps and end-effectors via list/dict caches
-- `[x]` Module 4: Dual-Arm System Integrator (`main.py`)
-  - `[x]` Update XML generator to construct dual Franka Panda arms
-  - `[x]` Configure dual spatial transformers with independent offsets
-  - `[x]` Set up separate bumpless transfer blending logic for both arms
-  - `[x]` Implement synchronous control loops for left and right arm target tracking
-  - `[x]` Update OpenCV text overlays to display metrics for both arms
-- `[/]` Verification
-  - `[ ]` Verify successful dual-arm tracking and independent hand gestures
+- `[x]` Reorganize configurations in `main.py`
+  - `[x]` Rename current `franka_panda` configuration to `franka_panda_geometric`
+  - `[x]` Add new `franka_panda_industrial` configuration in `ROBOT_CONFIGS`
+- `[x]` Implement Industrial Model Auto-Downloader & Generator
+  - `[x]` Add `generate_franka_panda_industrial_xml()` in `main.py`
+  - `[x]` Implement robust checks and automatic fetching of model XML & OBJ/STL meshes
+  - `[x]` Parse and recursively duplicate `link0` base body with Left/Right suffixes
+  - `[x]` Generate Left/Right mocap targets, weld constraints, table, cubes, and actuators
+- `[x]` Configure Initial State & Blending
+  - `[x]` Set model initial joint variables to home keyframe pose on load
+  - `[x]` Align starting mocap coordinates with home pose end-effector values
+- `[x]` Verification
+  - `[x]` Verify execution of `franka_panda_geometric`
+  - `[x]` Verify auto-downloader, compile, and runtime execution of `franka_panda_industrial`

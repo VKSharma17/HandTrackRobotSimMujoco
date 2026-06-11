@@ -48,3 +48,20 @@ python main.py
 ## 4. Bug Fixes
 *   **Perception Return Mismatch**: Resolved `ValueError: not enough values to unpack (expected 4, got 3)` by ensuring `process_frame()` in [hand_tracker.py](file:///d:/VKS/VKSLearn/HandRobotSimMujoco/hand_tracker.py) correctly returns `d_palm` alongside the filtered/raw coordinates and pinch distance.
 *   **Variable Scope / Initialization**: Resolved a potential `NameError: name 'prev_loop_time' is not defined` by initializing `prev_loop_time` to `start_time` in [main.py](file:///d:/VKS/VKSLearn/HandRobotSimMujoco/main.py) before entering the teleoperation loop.
+
+---
+
+## 5. Industrial Model Integration (MuJoCo Menagerie)
+We integrated the official high-fidelity **Franka Emika Panda** model from the DeepMind `mujoco_menagerie` repository as a selectable, plug-and-play configuration option (`franka_panda_industrial`).
+
+### Highlights
+1. **Auto-Downloader**: Built automatic asset fetching into the XML generator. If the official model folder is not found locally, the script downloads the MJCF XML and all 67 OBJ/STL visual/collision meshes from GitHub raw storage.
+2. **Recursive XML Prefixing**: Developed a recursive parser that duplicates the robot base (`link0`) tree, appending suffixes `_left` and `_right` to all joint, body, and geom names to avoid XML compilation naming collisions.
+3. **Home Joint Pose Initialization**: Sets `sim.data.qpos` to the official home keyframe angles on load:
+   `home_val = [0, 0, 0, -1.57079, 0, 1.57079, -0.7853, 0.04, 0.04]`
+   This pre-configures both arms in a natural, stable bent configuration on startup.
+4. **Target Alignment**: Symmetrically places the default mocap targets and the spatial transformer center at the exact end-effector home coordinate:
+   * Left: `[0.554, 0.25, 0.625]`
+   * Right: `[0.554, -0.25, 0.625]`
+   This eliminates violent startup snaps.
+

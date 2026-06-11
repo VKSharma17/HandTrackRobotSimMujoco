@@ -150,7 +150,7 @@ class HandTracker:
             d_palm = float(np.linalg.norm(np.array([wrist.x - mcp.x, wrist.y - mcp.y])))
             
             # Linearly map palm scale from range [0.1, 0.4] to depth coordinate in range [-0.3, 0]
-            d_min, d_max = 0.1, 0.4
+            d_min, d_max = 0.08, 0.35
             depth_ratio = np.clip((d_palm - d_min) / (d_max - d_min), 0.0, 1.0)
             z_depth_proxy = -0.3 + 0.3 * depth_ratio
             

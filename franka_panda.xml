@@ -1,0 +1,197 @@
+<mujoco model="franka_panda_teleop">
+    <compiler angle="degree" coordinate="local"/>
+    <option timestep="0.002" integrator="RK4">
+        <flag energy="enable"/>
+    </option>
+    
+    <default>
+        <joint damping="0.1" armature="0.01" limited="true"/>
+        <geom condim="3" material="panda_material"/>
+    </default>
+
+    <asset>
+        <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="512"/>
+        <texture name="grid" type="2d" builtin="checker" rgb1="0.15 0.15 0.15" rgb2="0.2 0.2 0.2" width="512" height="512" mark="edge" markrgb="0.3 0.3 0.3"/>
+        <material name="grid_material" texture="grid" texrepeat="2 2" texuniform="true"/>
+        <material name="panda_material" rgba="0.85 0.85 0.85 1.0"/>
+        <material name="joint_material" rgba="0.18 0.18 0.18 1.0"/>
+        <material name="gripper_material" rgba="0.3 0.3 0.3 1.0"/>
+    </asset>
+
+    <worldbody>
+        <light pos="0 0 3" dir="0 0 -1" directional="true" castshadow="true"/>
+        <geom name="floor" type="plane" size="2 2 0.1" material="grid_material"/>
+
+        <!-- Manipulation Workspace Table (Surface at Z = 0) -->
+        <body name="table" pos="0.45 0.0 0.0">
+            <geom name="table_top" type="box" size="0.25 0.50 0.01" pos="0 0 -0.01" rgba="0.25 0.25 0.25 1.0"/>
+        </body>
+
+        
+        <!-- Manipulation Cube Object 0 -->
+        <body name="cube_0" pos="0.508 0.250 0.02">
+            <joint name="cube_joint_0" type="free"/>
+            <geom name="cube_geom_0" type="box" size="0.02 0.02 0.02" rgba="0.9 0.45 0.1 1.0" mass="0.05" condim="6" friction="1.0 0.005 0.0001"/>
+        </body>
+        <!-- Manipulation Cube Object 1 -->
+        <body name="cube_1" pos="0.475 -0.347 0.02">
+            <joint name="cube_joint_1" type="free"/>
+            <geom name="cube_geom_1" type="box" size="0.02 0.02 0.02" rgba="0.1 0.6 0.9 1.0" mass="0.05" condim="6" friction="1.0 0.005 0.0001"/>
+        </body>
+        <!-- Manipulation Cube Object 2 -->
+        <body name="cube_2" pos="0.415 0.074 0.02">
+            <joint name="cube_joint_2" type="free"/>
+            <geom name="cube_geom_2" type="box" size="0.02 0.02 0.02" rgba="0.8 0.1 0.8 1.0" mass="0.05" condim="6" friction="1.0 0.005 0.0001"/>
+        </body>
+        <!-- Manipulation Cube Object 3 -->
+        <body name="cube_3" pos="0.540 -0.110 0.02">
+            <joint name="cube_joint_3" type="free"/>
+            <geom name="cube_geom_3" type="box" size="0.02 0.02 0.02" rgba="0.9 0.9 0.1 1.0" mass="0.05" condim="6" friction="1.0 0.005 0.0001"/>
+        </body>
+        <!-- Manipulation Cube Object 4 -->
+        <body name="cube_4" pos="0.436 0.263 0.02">
+            <joint name="cube_joint_4" type="free"/>
+            <geom name="cube_geom_4" type="box" size="0.02 0.02 0.02" rgba="0.1 0.8 0.5 1.0" mass="0.05" condim="6" friction="1.0 0.005 0.0001"/>
+        </body>
+
+        
+        <!-- 7-DOF Franka Emika Panda Robot Arm (_left) -->
+        <body name="base_left" pos="0 0.25 0.0">
+            <geom name="base_geom_left" type="cylinder" size="0.075 0.05" pos="0 0 0.025" material="joint_material"/>
+            
+            <body name="link1_left" pos="0 0 0.05">
+                <joint name="joint1_left" type="hinge" axis="0 0 1" range="-166 166"/>
+                <geom name="link1_geom_left" type="cylinder" size="0.06 0.14" pos="0 0 0.14"/>
+                
+                <body name="link2_left" pos="0 0 0.28">
+                    <joint name="joint2_left" type="hinge" axis="0 1 0" range="-101 101"/>
+                    <geom name="link2_geom_left" type="box" size="0.05 0.05 0.1" pos="0 0 0.1"/>
+                    
+                    <body name="link3_left" pos="0 0 0.2">
+                        <joint name="joint3_left" type="hinge" axis="0 0 1" range="-166 166"/>
+                        <geom name="link3_geom_left" type="cylinder" size="0.045 0.14" pos="0 0 0.14"/>
+                        
+                        <body name="link4_left" pos="0 0 0.28">
+                            <joint name="joint4_left" type="hinge" axis="0 -1 0" range="-176 0"/>
+                            <geom name="link4_geom_left" type="box" size="0.04 0.04 0.1" pos="0 0 0.1"/>
+                            
+                            <body name="link5_left" pos="0 0 0.2">
+                                <joint name="joint5_left" type="hinge" axis="0 0 1" range="-166 166"/>
+                                <geom name="link5_geom_left" type="cylinder" size="0.04 0.15" pos="0 0 0.15"/>
+                                
+                                <body name="link6_left" pos="0 0 0.3">
+                                    <joint name="joint6_left" type="hinge" axis="0 1 0" range="-5 215"/>
+                                    <geom name="link6_geom_left" type="box" size="0.035 0.035 0.06" pos="0 0 0.06"/>
+                                    
+                                    <body name="link7_left" pos="0 0 0.12">
+                                        <joint name="joint7_left" type="hinge" axis="0 0 1" range="-166 166"/>
+                                        <geom name="link7_geom_left" type="cylinder" size="0.035 0.04" pos="0 0 0.04" material="joint_material"/>
+                                        
+                                        <body name="hand_left" pos="0 0 0.08">
+                                            <geom name="hand_geom_left" type="box" size="0.04 0.06 0.03" pos="0 0 0.015" material="gripper_material"/>
+                                            
+                                            <body name="finger_left_left" pos="0 0.02 0.03">
+                                                <joint name="finger_joint1_left" type="slide" axis="0 1 0" range="0 0.04"/>
+                                                <geom name="finger_left_geom_left" type="box" size="0.01 0.01 0.035" pos="0 0 0.035" material="panda_material" condim="4" friction="1.0 0.005 0.0001"/>
+                                            </body>
+                                            
+                                            <body name="finger_right_left" pos="0 -0.02 0.03">
+                                                <joint name="finger_joint2_left" type="slide" axis="0 -1 0" range="0 0.04"/>
+                                                <geom name="finger_right_geom_left" type="box" size="0.01 0.01 0.035" pos="0 0 0.035" material="panda_material" condim="4" friction="1.0 0.005 0.0001"/>
+                                            </body>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+        </body>
+        
+        <!-- 7-DOF Franka Emika Panda Robot Arm (_right) -->
+        <body name="base_right" pos="0 -0.25 0.0">
+            <geom name="base_geom_right" type="cylinder" size="0.075 0.05" pos="0 0 0.025" material="joint_material"/>
+            
+            <body name="link1_right" pos="0 0 0.05">
+                <joint name="joint1_right" type="hinge" axis="0 0 1" range="-166 166"/>
+                <geom name="link1_geom_right" type="cylinder" size="0.06 0.14" pos="0 0 0.14"/>
+                
+                <body name="link2_right" pos="0 0 0.28">
+                    <joint name="joint2_right" type="hinge" axis="0 1 0" range="-101 101"/>
+                    <geom name="link2_geom_right" type="box" size="0.05 0.05 0.1" pos="0 0 0.1"/>
+                    
+                    <body name="link3_right" pos="0 0 0.2">
+                        <joint name="joint3_right" type="hinge" axis="0 0 1" range="-166 166"/>
+                        <geom name="link3_geom_right" type="cylinder" size="0.045 0.14" pos="0 0 0.14"/>
+                        
+                        <body name="link4_right" pos="0 0 0.28">
+                            <joint name="joint4_right" type="hinge" axis="0 -1 0" range="-176 0"/>
+                            <geom name="link4_geom_right" type="box" size="0.04 0.04 0.1" pos="0 0 0.1"/>
+                            
+                            <body name="link5_right" pos="0 0 0.2">
+                                <joint name="joint5_right" type="hinge" axis="0 0 1" range="-166 166"/>
+                                <geom name="link5_geom_right" type="cylinder" size="0.04 0.15" pos="0 0 0.15"/>
+                                
+                                <body name="link6_right" pos="0 0 0.3">
+                                    <joint name="joint6_right" type="hinge" axis="0 1 0" range="-5 215"/>
+                                    <geom name="link6_geom_right" type="box" size="0.035 0.035 0.06" pos="0 0 0.06"/>
+                                    
+                                    <body name="link7_right" pos="0 0 0.12">
+                                        <joint name="joint7_right" type="hinge" axis="0 0 1" range="-166 166"/>
+                                        <geom name="link7_geom_right" type="cylinder" size="0.035 0.04" pos="0 0 0.04" material="joint_material"/>
+                                        
+                                        <body name="hand_right" pos="0 0 0.08">
+                                            <geom name="hand_geom_right" type="box" size="0.04 0.06 0.03" pos="0 0 0.015" material="gripper_material"/>
+                                            
+                                            <body name="finger_left_right" pos="0 0.02 0.03">
+                                                <joint name="finger_joint1_right" type="slide" axis="0 1 0" range="0 0.04"/>
+                                                <geom name="finger_left_geom_right" type="box" size="0.01 0.01 0.035" pos="0 0 0.035" material="panda_material" condim="4" friction="1.0 0.005 0.0001"/>
+                                            </body>
+                                            
+                                            <body name="finger_right_right" pos="0 -0.02 0.03">
+                                                <joint name="finger_joint2_right" type="slide" axis="0 -1 0" range="0 0.04"/>
+                                                <geom name="finger_right_geom_right" type="box" size="0.01 0.01 0.035" pos="0 0 0.035" material="panda_material" condim="4" friction="1.0 0.005 0.0001"/>
+                                            </body>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+        </body>
+
+        
+        <!-- Mocap Target for _left -->
+        <body name="mocap_target_left" mocap="true" pos="0.0 0.25 1.51">
+            <geom name="mocap_geom_left" type="sphere" size="0.02" rgba="0 1 0 0.4" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.002" fromto="0 0 0 0.06 0 0" rgba="1 0 0 0.8" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.002" fromto="0 0 0 0 0.06 0" rgba="0 1 0 0.8" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.002" fromto="0 0 0 0 0 0.06" rgba="0 0 1 0.8" contype="0" conaffinity="0"/>
+        </body>
+        
+        <!-- Mocap Target for _right -->
+        <body name="mocap_target_right" mocap="true" pos="0.0 -0.25 1.51">
+            <geom name="mocap_geom_right" type="sphere" size="0.02" rgba="0 1 0 0.4" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.002" fromto="0 0 0 0.06 0 0" rgba="1 0 0 0.8" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.002" fromto="0 0 0 0 0.06 0" rgba="0 1 0 0.8" contype="0" conaffinity="0"/>
+            <geom type="cylinder" size="0.002" fromto="0 0 0 0 0 0.06" rgba="0 0 1 0.8" contype="0" conaffinity="0"/>
+        </body>
+    </worldbody>
+
+    <!-- Weld constraints to drag hands with mocaps -->
+    <equality>
+        <weld name="teleop_weld_left" body1="hand_left" body2="mocap_target_left"/>
+        <weld name="teleop_weld_right" body1="hand_right" body2="mocap_target_right"/>
+    </equality>
+
+    <!-- Gripper position controllers -->
+    <actuator>
+        <position name="finger_actuator1_left" joint="finger_joint1_left" ctrlrange="0 0.04" kp="100"/>
+        <position name="finger_actuator2_left" joint="finger_joint2_left" ctrlrange="0 0.04" kp="100"/>
+        <position name="finger_actuator1_right" joint="finger_joint1_right" ctrlrange="0 0.04" kp="100"/>
+        <position name="finger_actuator2_right" joint="finger_joint2_right" ctrlrange="0 0.04" kp="100"/>
+    </actuator>
+</mujoco>
